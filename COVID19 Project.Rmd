@@ -1,0 +1,283 @@
+---
+title: "Investigating COVID-19 Virus Trends"
+output:
+  html_document: default
+  pdf_document: default
+date: "2024-08-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Investigating COVID-19 Virus Trends
+
+### Introduction
+
+**Data Source:**
+
+This Guided Project focuses on a pneumonia of unknown cause detected in Wuhan, China. It was first internationally reported from China on 31 December 2019. 
+
+The analysis uses a [dataset, from Kaggle](https://www.kaggle.com/datasets/lin0li/covid19testing) , which includes various columns such as date, continent, country codes, country names, and several metrics related to COVID-19 cases, testing, hospitalizations, and recoveries.
+
+**Objective:**
+The project focuses on analyzing COVID-19 data to address the following question: **Which countries have reported the highest number of positive cases in relation to the number of tests conducted?**
+
+### Data Columns
+
+The data is composed of the following:
+
+1.  `Date`: Date
+
+2.  `Continent_Name`: Continent names
+
+3.  `Two_Letter_Country_Code`: Country codes
+
+4.  `Country_Region`: Country names
+
+5.  `Province_State`: States/province names; value is `All States` when state/provincial level data is not available
+
+6.  `positive`: Cumulative number of positive cases reported.
+
+7.  `active`: Number of active cases on that **day**.
+
+8.  `hospitalized`: Cumulative number of hospitalized cases reported.
+
+9.  `hospitalizedCurr`: Number of actively hospitalized cases on that **day**.
+
+10. `recovered`: Cumulative number of recovered cases reported.
+
+11. `death`: Cumulative number of deaths reported.
+
+12. `total_tested`: Cumulative number of tests conducted.
+
+13. `daily_tested`: Number of tests conducted on the **day**; if daily data is unavailable, daily tested is averaged across number of days in between.
+
+14. `daily_positive`: Number of positive cases reported on the **day**; if daily data is unavailable, daily positive is averaged across number of days in.
+
+```{r}
+#understand the data
+
+library(readr)
+covid_df <- read_csv("covid19.csv")
+
+#determine dimensions of the dataframe
+dim(covid_df)
+
+#determine the column names of covid_df 
+
+vector_cols <- colnames(covid_df)
+
+head(vector_cols)
+
+
+
+```
+
+```{r}
+library(tibble)
+glimpse(vector_cols)
+```
+
+```{r}
+covid_df
+
+```
+
+```{r}
+#Filter the province state column to only include All States
+library(tidyverse)
+
+```
+
+```{r}
+covid_df_all_states <- covid_df %>% 
+  filter(Province_State == "All States") %>% 
+  select(-Province_State)
+
+covid_df_all_states
+```
+
+## Isolating necessary columns
+
+```{r}
+#seperately analyse daily and commulative column measures to avoid errors and bias
+
+covid_df_all_states_daily <- select(covid_df_all_states, Date, Country_Region, active, hospitalizedCurr, daily_tested, daily_positive)
+
+covid_df_all_states_daily
+```
+
+## Analysing Trends by Country
+
+-   How can we get the overall number of COVID-19 tested, positive, active and hospitalized cases by country since we currently have daily data?
+
+-    We can sorts the countries by the number of tests conducted in descending order, allowing for easy identification of countries with the highest testing activity. This can be useful for comparing the scale of testing efforts and the corresponding COVID-19 impact across different countries.
+
+```{r}
+
+
+covid_df_all_states_daily_sum <- covid_df_all_states_daily %>%
+group_by(Country_Region) %>%
+  summarize(
+tested = sum(daily_tested),
+positive = sum(daily_positive),
+active = sum(active),
+hopitalized = sum(hospitalizedCurr)) %>%
+  arrange(-tested)
+
+# Display the summarized dataframe
+print(covid_df_all_states_daily_sum)
+```
+
+```{r}
+covid_top_10 <- head(covid_df_all_states_daily_sum, 10)
+covid_top_10
+```
+
+Which countries have had the highest number of positive cases against the number of tests?
+
+```{r}
+countries <- covid_top_10$Country_Region
+
+tested_cases <- covid_top_10$tested
+
+positive_cases <- covid_top_10$positive
+
+active_cases <- covid_top_10$active
+
+hospitalized_cases <- covid_top_10$hopitalized
+
+
+# Assign country names to the vectors using the names() function
+names(positive_cases) <- countries
+
+names(tested_cases) <- countries
+
+names(active_cases) <- countries
+
+names(hospitalized_cases) <- countries
+
+# Display the vectors to verify they have been named correctly
+print(tested_cases)
+print(positive_cases)
+print(active_cases)
+print(hospitalized_cases)
+
+
+
+```
+
+```{r}
+#Identify the top three positive against tested cases.
+
+positive_tested_ratio <- (positive_cases / tested_cases)
+
+# Sort the ratios in descending order and get the top three
+positive_tested_top_3 <- sort(positive_tested_ratio, decreasing = TRUE)[1:3]
+
+positive_tested_top_3
+```
+
+## Creating Lists 
+
+To keep all the information available for the top three countries that have had the highest number of positive cases against the number of tests carried out, we can create a matrix.
+
+```{r}
+selected_countries_df <- covid_top_10 %>%
+  filter(Country_Region %in% c("United Kingdom", "Turkey", "United States"))
+
+# Display the selected rows
+print(selected_countries_df)
+```
+
+```{r}
+
+
+
+# Creating vectors
+united_kingdom <- c(0.11, 1473672, 166909, 0, 0)
+united_states <- c(0.10, 17282363, 1877179, 0, 0)
+turkey <- c(0.08, 2031192, 163941, 2980960, 0)
+
+
+```
+
+```{r}
+# Combine the vectors into a matrix using rbind
+covid_mat <- rbind(united_kingdom, united_states, turkey)
+
+# Rename the columns of the matrix
+colnames(covid_mat) <- c("Ratio", "tested", "positive", "active", "hospitalized")
+
+# Display the resulting matrix
+print(covid_mat)
+```
+
+We can now create a list to store all our work in the same variable
+
+```{r}
+question <- "Which countries have had the highest number of positive cases against the number of tests?"
+
+answer <- c("Positive tested cases" = positive_tested_top_3)
+
+# Create a list that contains the dataframes
+dataframes_list <- list(
+  covid_df = covid_df,
+  covid_df_all_states = covid_df_all_states,
+  covid_df_all_states_daily = covid_df_all_states_daily,
+  covid_top_10 = covid_top_10
+)
+
+# Create a list that contains the matrices
+matrices_list <- list(
+  covid_mat = covid_mat
+)
+
+# Create a list that contains the vectors
+vectors_list <- list(
+  vector_cols = vector_cols,
+  countries = countries
+)
+
+# Create a named list that contains the data structure lists
+data_structure_list <- list(
+  dataframes = dataframes_list,
+  matrices = matrices_list,
+  vectors = vectors_list
+)
+
+# Create the final list containing question, answer, and data_structure_list
+covid_analysis_list <- list(
+  question = question,
+  answer = answer,
+  data_structure_list = data_structure_list
+)
+
+
+# Display the second element of covid_analysis_list (the answer list)
+print(covid_analysis_list$answer)
+```
+
+```{}
+```
+
+### Conclusion
+
+The analysis of COVID-19 trends provides a valuable insight into the pandemic's impact across different countries. By examining the ratio of positive cases to tests conducted, we identified key regions that experienced a significant spread of the virus relative to their testing efforts.
+
+**Key Findings:**
+
+-   **High Positive-to-Test Ratios:** The analysis highlighted that certain countries, such as the United States, United Kingdom, and Turkey, reported higher ratios of positive cases relative to the number of tests conducted. This suggests that these countries experienced a more widespread transmission of the virus, potentially indicating challenges in testing capacity or high transmission rates during certain periods.
+
+-   **Impact on Healthcare Systems:** The data on active and hospitalized cases provide insights into how different countries' healthcare systems managed the influx of COVID-19 patients. Countries with higher hospitalization rates may have faced significant pressure on their healthcare resources.
+
+-   **Continued Monitoring and Response:** The findings underscore the importance of ongoing monitoring and data analysis to understand the evolving dynamics of the COVID-19 pandemic. Effective testing and reporting remain crucial for managing outbreaks and implementing appropriate public health responses.
+
+**Recommendations:**
+
+-   **Enhancing Testing Capabilities:** Countries with high positive-to-test ratios should focus on increasing testing capabilities to better identify and isolate positive cases, thereby reducing the spread of the virus.
+
+-   **Targeted Interventions:** Public health strategies should be tailored to regions with high transmission rates, ensuring resources are directed where they are most needed to control outbreaks effectively.
+
+-   **Data-Driven Decisions:** Policymakers should leverage data analytics to make informed decisions regarding lockdown measures, vaccination campaigns, and resource allocation to mitigate the pandemic's impact.
